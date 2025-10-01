@@ -130,8 +130,13 @@ let
       fi
 
       echo "Container $instance is up at $ip"
-      echo "To redeploy:"
-      echo "  incus exec $instance -- nixos-rebuild switch --option experimental-features \"nix-command flakes\" --flake $remote_flake#${containerName}"
+      ${if nixosConfiguration != null then ''
+        echo "To redeploy:"
+        echo "  incus exec $instance -- nixos-rebuild switch --option experimental-features \"nix-command flakes\" --system \"$config_path\""
+      '' else ''
+        echo "To redeploy:"
+        echo "  incus exec $instance -- nixos-rebuild switch --option experimental-features \"nix-command flakes\" --flake $remote_flake#${containerName}"
+      ''}
     '';
 
   in

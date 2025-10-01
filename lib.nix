@@ -100,7 +100,7 @@ let
       remote_root=${remoteRoot}
 
       # Create a minimal scoped flake that just imports the configuration
-      sshKeysList=${builtins.toJSON sshKeys}
+      sshKeysList="[${builtins.concatStringsSep " " (map (key: ''"${key}"'') sshKeys)}]"
       minimal_flake="$(cat << FLAKE_EOF
 {
   description = "Container flake for ${containerName}";

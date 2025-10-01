@@ -1,5 +1,10 @@
 { lib, config, modulesPath, pkgs, ... }:
 {
+  imports = [
+    (modulesPath + "/virtualisation/lxc-container.nix")
+    (modulesPath + "/virtualisation/lxc-image-metadata.nix")
+  ];
+
   options.incus.container = {
     enable = lib.mkEnableOption "Incus container optimizations";
 
@@ -17,11 +22,6 @@
   };
 
   config = lib.mkIf config.incus.container.enable {
-    imports = [
-      (modulesPath + "/virtualisation/lxc-container.nix")
-      (modulesPath + "/virtualisation/lxc-image-metadata.nix")
-    ];
-
     boot.isContainer = true;
 
     networking.hostName = lib.mkDefault "incus-nixos";

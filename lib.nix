@@ -98,9 +98,10 @@ let
       # Use nixos-rebuild switch with the pre-built configuration path
       ${if nixosConfiguration != null then ''
         config_path="${nixosConfiguration}"
-        incus exec "$instance" -- nixos-rebuild switch \
-          --option experimental-features "nix-command flakes" \
-          --system "$config_path"
+        incus exec "$instance" -- sh -c "
+          nix-env --profile /nix/var/nix/profiles/system --set '$config_path'
+          '$config_path/bin/switch-to-configuration' switch
+        "
       '' else ''
         remote_root=${remoteRoot}
         remote_flake=${remoteRoot}/$(basename ${flakeOutPath})
@@ -131,8 +132,8 @@ let
 
       echo "Container $instance is up at $ip"
       ${if nixosConfiguration != null then ''
-        echo "To redeploy:"
-        echo "  incus exec $instance -- nixos-rebuild switch --option experimental-features \"nix-command flakes\" --system \"$config_path\""
+        echo "To redeploy: rebuild the configuration locally and run:"
+        echo "  incus exec $instance -- sh -c \"nix-env --profile /nix/var/nix/profiles/system --set '$config_path' && '$config_path/bin/switch-to-configuration' switch\""
       '' else ''
         echo "To redeploy:"
         echo "  incus exec $instance -- nixos-rebuild switch --option experimental-features \"nix-command flakes\" --flake $remote_flake#${containerName}"

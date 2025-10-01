@@ -19,14 +19,14 @@ Add to your `flake.nix`:
 {
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-    incus-flake.url = "github:Daviey/incus-flake";
+    nixos-incus-containers.url = "github:Daviey/nixos-incus-containers";
   };
 
-  outputs = { nixpkgs, incus-flake, ... }: {
+  outputs = { nixpkgs, nixos-incus-containers, ... }: {
     nixosConfigurations.my-container = nixpkgs.lib.nixosSystem {
       system = "x86_64-linux";
       modules = [
-        incus-flake.nixosModules.incus-container
+        nixos-incus-containers.nixosModules.incus-container
         {
           incus.container.enable = true;
           networking.hostName = "my-container";
@@ -57,8 +57,8 @@ For simpler configuration, use the `makeIncusHost` helper:
 
 ```nix
 {
-  outputs = { nixpkgs, incus-flake, ... }:
-    incus-flake.lib.makeIncusHost {
+  outputs = { nixpkgs, nixos-incus-containers, ... }:
+    nixos-incus-containers.lib.makeIncusHost {
       name = "my-container";
       modules = [
         {

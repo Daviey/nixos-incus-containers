@@ -8,6 +8,7 @@ let
     containerName,
     flakeOutPath,
     nixosConfiguration ? null,
+    sshKeys ? [],
     imageRemote ? "images",
     imagePath ? "nixos/unstable",
     remoteRoot ? "/root/${containerName}-flake",
@@ -115,6 +116,9 @@ let
         {
           incus.container.enable = true;
           networking.hostName = "${containerName}";
+
+          # SSH access with provided keys
+          users.users.root.openssh.authorizedKeys.keys = sshKeys;
 
           # Basic nginx hello world
           services.nginx = {

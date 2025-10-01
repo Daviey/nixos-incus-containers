@@ -7,6 +7,7 @@ let
     pkgs,
     containerName,
     flakeOutPath,
+    nixosConfiguration ? null,
     imageRemote ? "images",
     imagePath ? "nixos/unstable",
     remoteRoot ? "/root/${containerName}-flake",
@@ -94,16 +95,24 @@ let
         sleep 2
       done
 
-      remote_root=${remoteRoot}
-      remote_flake=${remoteRoot}/$(basename ${flakeOutPath})
+      # Use nixos-rebuild switch with the pre-built configuration path
+      ${if nixosConfiguration != null then ''
+        config_path="${nixosConfiguration}"
+        incus exec "$instance" -- nixos-rebuild switch \
+          --option experimental-features "nix-command flakes" \
+          --system "$config_path"
+      '' else ''
+        remote_root=${remoteRoot}
+        remote_flake=${remoteRoot}/$(basename ${flakeOutPath})
 
-      incus exec "$instance" -- rm -rf "$remote_root"
-      incus exec "$instance" -- mkdir -p "$remote_root"
-      incus file push -p -r ${flakeOutPath} "$instance$remote_root"
+        incus exec "$instance" -- rm -rf "$remote_root"
+        incus exec "$instance" -- mkdir -p "$remote_root"
+        incus file push -p -r ${flakeOutPath} "$instance$remote_root"
 
-      incus exec "$instance" -- nixos-rebuild switch \
-        --option experimental-features "nix-command flakes" \
-        --flake "$remote_flake#${containerName}"
+        incus exec "$instance" -- nixos-rebuild switch \
+          --option experimental-features "nix-command flakes" \
+          --flake "$remote_flake#${containerName}"
+      ''}
 
       ip=""
       for _ in $(seq 1 20); do

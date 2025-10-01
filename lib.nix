@@ -95,25 +95,55 @@ let
         sleep 2
       done
 
-      # Use nixos-rebuild switch with the pre-built configuration path
-      ${if nixosConfiguration != null then ''
-        config_path="${nixosConfiguration}"
-        incus exec "$instance" -- sh -c "
-          nix-env --profile /nix/var/nix/profiles/system --set '$config_path'
-          '$config_path/bin/switch-to-configuration' switch
-        "
-      '' else ''
-        remote_root=${remoteRoot}
-        remote_flake=${remoteRoot}/$(basename ${flakeOutPath})
+      # Deploy using flake reference (for now, keeping it simple)
+      remote_root=${remoteRoot}
 
-        incus exec "$instance" -- rm -rf "$remote_root"
-        incus exec "$instance" -- mkdir -p "$remote_root"
-        incus file push -p -r ${flakeOutPath} "$instance$remote_root"
+      # Create a minimal scoped flake that just imports the configuration
+      minimal_flake="$(cat << 'FLAKE_EOF'
+{
+  description = "Container flake for ${containerName}";
+  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+  inputs.nixos-incus-containers = {
+    url = "github:Daviey/nixos-incus-containers";
+    inputs.nixpkgs.follows = "nixpkgs";
+  };
+  outputs = { nixpkgs, nixos-incus-containers, ... }: {
+    nixosConfigurations.${containerName} = nixpkgs.lib.nixosSystem {
+      system = "x86_64-linux";
+      modules = [
+        nixos-incus-containers.nixosModules.incus-container
+        {
+          incus.container.enable = true;
+          networking.hostName = "${containerName}";
 
-        incus exec "$instance" -- nixos-rebuild switch \
-          --option experimental-features "nix-command flakes" \
-          --flake "$remote_flake#${containerName}"
-      ''}
+          # Basic nginx hello world
+          services.nginx = {
+            enable = true;
+            virtualHosts."localhost" = {
+              listen = [{ addr = "0.0.0.0"; port = 8080; }];
+              locations."/" = {
+                return = "200 \"<!DOCTYPE html><html><head><title>Hello World Container</title></head><body><h1>Hello from NixOS Incus Container!</h1><p>Container: ${containerName}</p></body></html>\"";
+                extraConfig = "add_header Content-Type text/html;";
+              };
+            };
+          };
+          networking.firewall.allowedTCPPorts = [ 8080 ];
+          system.stateVersion = "25.05";
+        }
+      ];
+    };
+  };
+}
+FLAKE_EOF
+)"
+
+      incus exec "$instance" -- rm -rf "$remote_root"
+      incus exec "$instance" -- mkdir -p "$remote_root"
+      echo "$minimal_flake" | incus file push - "$instance$remote_root/flake.nix"
+
+      incus exec "$instance" -- nixos-rebuild switch \
+        --option experimental-features "nix-command flakes" \
+        --flake "$remote_root#${containerName}"
 
       ip=""
       for _ in $(seq 1 20); do
@@ -131,13 +161,8 @@ let
       fi
 
       echo "Container $instance is up at $ip"
-      ${if nixosConfiguration != null then ''
-        echo "To redeploy: rebuild the configuration locally and run:"
-        echo "  incus exec $instance -- sh -c \"nix-env --profile /nix/var/nix/profiles/system --set '$config_path' && '$config_path/bin/switch-to-configuration' switch\""
-      '' else ''
-        echo "To redeploy:"
-        echo "  incus exec $instance -- nixos-rebuild switch --option experimental-features \"nix-command flakes\" --flake $remote_flake#${containerName}"
-      ''}
+      echo "To redeploy:"
+      echo "  incus exec $instance -- nixos-rebuild switch --option experimental-features \"nix-command flakes\" --flake $remote_root#${containerName}"
     '';
 
   in

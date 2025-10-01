@@ -100,7 +100,8 @@ let
       remote_root=${remoteRoot}
 
       # Create a minimal scoped flake that just imports the configuration
-      minimal_flake="$(cat << 'FLAKE_EOF'
+      sshKeysList=${builtins.toJSON sshKeys}
+      minimal_flake="$(cat << FLAKE_EOF
 {
   description = "Container flake for ${containerName}";
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
@@ -118,7 +119,7 @@ let
           networking.hostName = "${containerName}";
 
           # SSH access with provided keys
-          users.users.root.openssh.authorizedKeys.keys = sshKeys;
+          users.users.root.openssh.authorizedKeys.keys = $sshKeysList;
 
           # Basic nginx hello world
           services.nginx = {
